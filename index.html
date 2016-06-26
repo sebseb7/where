@@ -13,10 +13,16 @@
 			#map {
 				height: 100%;
 			}
+			#legend {
+				background: white;
+				padding: 10px;
+				margin: 10px;
+			}
 		</style>
 	</head>
 	<body>
 		<div id="map"></div>
+		<div id="legend"><input type="text" id="counter" style="width:20px"/><br/><a href="javascript:loadpath();">load</a></div>
 		<script>
 
 			var map;
@@ -26,7 +32,10 @@
 					center: {lat: 51.065338, lng: 13.751926},
 					zoom: 18
 				});
+				map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(document.getElementById('legend'));
 			};
+
+
 
 		</script>
 		<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCXdi6bYauELE7KdjlavIX5_Ezc8fdppVc&callback=initMap" async defer></script>
@@ -37,6 +46,12 @@
 
 			var lastlon;
 			var lastlat;
+			
+			function loadpath()
+			{
+				var count = parseInt(document.getElementById('counter').value);
+				socket.emit('load',count);
+			};
 
 			socket.on('pos', function(msg){
 			

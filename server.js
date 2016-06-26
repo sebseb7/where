@@ -49,7 +49,27 @@ app.get('/', function(req, res){
 	res.sendFile('index.html', { root: __dirname });
 });
 
+
 io.on('connection', function(socket){
+
+	socket.on('load', function(msg){
+	
+		if(msg)
+		{
+			db.each("SELECT time,lat,long,speed,heading,satnum,eventid FROM track WHERE satnum > 5 ORDER BY packetid DESC LIMIT ?",msg, function(err, pos) {
+				io.emit('pos',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.time+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
+			});
+		}
+	
+	});
+
+	db.each("SELECT time,lat,long,speed,heading,satnum,eventid FROM track WHERE satnum > 6 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
+		io.emit('pos',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.time+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
+	});
+	db.each("SELECT time,lat,long,speed,heading,satnum,eventid FROM track ORDER BY packetid DESC LIMIT 1", function(err, pos) {
+		io.emit('pos',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.time+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
+	});
+	
 	console.log("browser connected");
 });
 
