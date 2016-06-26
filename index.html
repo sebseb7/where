@@ -46,9 +46,13 @@
 
 			var lastlon;
 			var lastlat;
+			var globmarker=true;
 			
 			function loadpath()
 			{
+				lastlon=null;
+				lastlat=null;
+				//globmarker=false;
 				var count = parseInt(document.getElementById('counter').value);
 				socket.emit('load',count);
 			};
@@ -59,30 +63,34 @@
 				{
 					var myLatlng = new google.maps.LatLng(msg.lon,msg.lat);
 					map.panTo(myLatlng);
-			
-					var marker = new google.maps.Marker({
-						position: myLatlng,
-						map: map,
-						title: ''
-					});
+		
+					if(globmarker)
+					{	
+
+						var marker = new google.maps.Marker({
+							position: myLatlng,
+							map: map,
+							title: ''
+						});
 
 
-					if(msg.speed > 0)
-					{
-						marker.setIcon({
-							path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-							scale: 4,
-							rotation: parseInt(msg.head,10)
+						if(msg.speed > 0)
+						{
+							marker.setIcon({
+								path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+								scale: 2,
+								rotation: parseInt(msg.head,10)
+							});
+						};
+
+						var infowindow = new google.maps.InfoWindow({
+							content: msg.info
+						});
+						
+						marker.addListener('click', function() {
+							infowindow.open(map, marker);
 						});
 					};
-
-					var infowindow = new google.maps.InfoWindow({
-						content: msg.info
-					});
-						
-					marker.addListener('click', function() {
-						infowindow.open(map, marker);
-					});
 
 					if((lastlon)&&(lastlon != msg.lon)&&(lastlat != msg.lat))
 					{
@@ -90,10 +98,21 @@
 
 							var coordinates = [myLatlng2,myLatlng];
 
+							var color = '#FF0000';
+
+							if(msg.speed > 4 )
+							{
+								color = '#FF00FF';
+							}
+							if(msg.speed > 20 )
+							{
+								color = '#0000FF';
+							}
+
 							var path = new google.maps.Polyline({
 												path: coordinates,
 												geodesic: true,
-												strokeColor: '#FF0000',
+												strokeColor: color,
 												strokeOpacity: 1.0,
 												strokeWeight: 2
 							});
