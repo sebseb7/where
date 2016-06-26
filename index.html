@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Simple Map</title>
+		<meta name="viewport" content="initial-scale=1.0">
+		<meta charset="utf-8">
+		<style>
+			html, body {
+				height: 100%;
+				margin: 0;
+				padding: 0;
+			}
+			#map {
+				height: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="map"></div>
+		<script>
+
+			var map;
+
+			function initMap() {
+				map = new google.maps.Map(document.getElementById('map'), {
+					center: {lat: -34.397, lng: 150.644},
+					zoom: 18
+				});
+			
+				var myLatlng = new google.maps.LatLng(51.065338, 13.751926);
+				map.panTo(myLatlng);
+			
+			};
+
+		</script>
+		<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCXdi6bYauELE7KdjlavIX5_Ezc8fdppVc&callback=initMap" async defer></script>
+
+		<script src="/socket.io/socket.io.js"></script>
+		<script>
+			var socket = io();
+
+			var lastlon;
+			var lastlat;
+
+			socket.on('pos', function(msg){
+			
+				if(map)
+				{
+					var myLatlng = new google.maps.LatLng(msg.lon,msg.lat);
+					map.panTo(myLatlng);
+			
+					var marker = new google.maps.Marker({
+						position: myLatlng,
+						map: map,
+						title: ''
+					});
+
+					marker.setIcon({
+						path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+						scale: 4,
+						rotation: parseInt(msg.head,10)
+					});
+
+					var infowindow = new google.maps.InfoWindow({
+						content: msg.info
+					});
+						
+					marker.addListener('click', function() {
+						infowindow.open(map, marker);
+					});
+
+					if((lastlon)&&(lastlon != msg.lon)&&(lastlat != msg.lat))
+					{
+							var myLatlng2 = new google.maps.LatLng(lastlon,lastlat);
+
+							var coordinates = [myLatlng2,myLatlng];
+
+							var path = new google.maps.Polyline({
+												path: coordinates,
+												geodesic: true,
+												strokeColor: '#FF0000',
+												strokeOpacity: 1.0,
+												strokeWeight: 2
+							});
+							path.setMap(map);
+					}
+
+
+
+					lastlon=msg.lon;
+					lastlat=msg.lat;
+				}
+			});
+		</script>
+	</body>
+</html>
