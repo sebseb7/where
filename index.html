@@ -55,11 +55,15 @@
 						title: ''
 					});
 
-					marker.setIcon({
-						path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-						scale: 4,
-						rotation: parseInt(msg.head,10)
-					});
+
+					if(msg.speed > 0)
+					{
+						marker.setIcon({
+							path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+							scale: 4,
+							rotation: parseInt(msg.head,10)
+						});
+					};
 
 					var infowindow = new google.maps.InfoWindow({
 						content: msg.info

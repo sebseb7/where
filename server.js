@@ -36,7 +36,7 @@ net.createServer(function (socket) {
 				
 				});
 						
-				io.emit('pos',{lat: fields[2],lon: fields[3],head: fields[5],info:fields[1]+"<br/>EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
+				io.emit('pos',{lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
 			};
 		}
 	});
