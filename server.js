@@ -10,6 +10,7 @@ var io = require('socket.io')(http);
 
 //db.serialize(function() {
 //	db.run("CREATE TABLE track (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time TEXT,lat REAL,long REAL,speed INTEGER,heading INTEGER,altitude INTEGER,satnum INTEGER,eventid INTEGER)");
+//  db.run("CREATE TABLE track_helper (packetid INTEGER PRIMARY KEY,avgspeed_short INTEGER,avgspeed_long INTEGER,avglat_short REAL, avglat_long REAL,avglong_short REAL, avglong_long REAL)");
 //});
 
 net.createServer(function (socket) {
@@ -56,7 +57,7 @@ io.on('connection', function(socket){
 	
 		if(msg)
 		{
-			db.each("SELECT time,lat,long,speed,heading,satnum,eventid FROM track WHERE satnum > 5 ORDER BY packetid DESC LIMIT ?",msg, function(err, pos) {
+			db.each("SELECT time,lat,long,speed,heading,satnum,eventid FROM track WHERE ((speed > 1) and (satnum > 5)) ORDER BY packetid DESC LIMIT ?",msg, function(err, pos) {
 				io.emit('pos',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.time+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
 			});
 		}
