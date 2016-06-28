@@ -9,13 +9,9 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
 
-//$WP+COMMTYPE=0000,4,,,<apn>,,,<ip/host>,<port>,0,<dns>
-//$WP+TRACK=0000,9,120,150,0,1,4,15
-//$WP+GBLAC=0000,1 
-//$WP+LOWBATT=0000,2
 
 
-// http://www.open-electronics.org/celltrack/celltxt.php?hex=1&mcc=262&mnc=07&lac=4F71&cid=5B0A&lac0=4F71&cid0=0CEA&lac1=4F71&cid1=DE14&lac2=&cid2=&lac3=&cid3=&lac4=&cid4=
+// http://www.open-electronics.org/celltrack/celltxt.php?hex=1&mcc=262&mnc=07&lac=4F71&cid=5B0A
 // 
 //  db.run("CREATE TABLE event (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),event INTEGER)");
 //	db.run("CREATE TABLE batt  (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),data TEXT,voltage REAL,charging INTEGER)");
@@ -38,20 +34,15 @@ net.createServer(function (socket) {
 	{
 		once = false;
 	
-		//socket.write("$WP+TRACK=0000,9,30,150,0,1,4,15\n");//<-car
-		//socket.write("$WP+TRACK=0000,9,30,100,0,1,4,40\n");//<-foot
-		//socket.write("$WP+TRACK=0000,4,300,100,0,1,4,70\n");//<-still
-		//socket.write("$WP+GSMINFO=0000\n");
-		//socket.write("$WP+TEST=0000\n");
-		//300(5) nach stillstand,aller 900(15) wieder
+		//SMS/USB: $WP+COMMTYPE=0000,4,,,<apn>,,,<ip/host>,<port>,0,<dns>
 		//socket.write("$WP+PSM=0000,1,300,1,2,2,3600\n");//GPRS active
 		//socket.write("$WP+PSM=0000,2,300,1,2,2,900\n");//GPRS off
 		//socket.write("$WP+PSM=0000,4,300,1,3,3,3600\n");//GSM off <--
-		//socket.write("$WP+IDLESET=0000,30,10\n");
-		//socket.write("$WP+PSM=0000,0\n");//poweron
 		//socket.write("$WP+SETMILE=0000,1,0\n");
 		//socket.write("$WP+GETLOCATION=0000\n");
 		//socket.write("$WP+REBOOT=0000\n");
+		//socket.write("$WP+GBLAC=0000,1\n");
+		//socket.write("$WP+LOWBATT=0000,2\n");
 	};
 
 	var timer1;
