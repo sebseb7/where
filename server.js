@@ -133,13 +133,14 @@ net.createServer(function (socket) {
 							track_mode = 'still';
 						}
 						db.run("INSERT INTO track2 (trackerid,dev_time,lat,long,speed,heading,altitude,satnum,eventid,mileage,avg_speed_10) VALUES (?,?,?,?,?,?,?,?,?,?,?)",0,fields[1],fields[2],fields[3],fields[4],fields[5],fields[6],fields[7],fields[8],parseInt(fields[9]*1000),row2.avg);
+					
+						io.emit('pos',{avg_speed_10: row2.avg,lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>MD:"+track_mode+" EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
 					});
 					if(fields[4] > 10)
 					{
 						track_mode='car';
 					}
 						
-					io.emit('pos',{lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>MD:"+track_mode+" EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
 				}
 				else
 				{
@@ -195,18 +196,18 @@ io.on('connection', function(socket){
 	
 		if(msg)
 		{
-			db.each("SELECT * FROM (SELECT packetid,datetime(time, 'unixepoch', 'localtime') as ltime,lat,long,speed,heading,satnum,eventid FROM track2 WHERE ((satnum > 5)and( speed>2)) ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg, function(err, pos) {
-				io.emit('pos',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
+			db.each("SELECT * FROM (SELECT packetid,datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 WHERE avg_speed_10 > 0 ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg, function(err, pos) {
+				io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
 			});
 		}
 	
 	});
 
-	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,lat,long,speed,heading,satnum,eventid FROM track2 WHERE satnum > 6 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
-		io.emit('pos',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
+	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 WHERE satnum > 5 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
+		io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
 	});
-	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,lat,long,speed,heading,satnum,eventid FROM track2 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
-		io.emit('pos',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
+	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
+		io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
 	});
 	
 	console.log("browser connected");
