@@ -17,12 +17,11 @@ var io = require('socket.io')(http);
 
 // http://www.open-electronics.org/celltrack/celltxt.php?hex=1&mcc=262&mnc=07&lac=4F71&cid=5B0A&lac0=4F71&cid0=0CEA&lac1=4F71&cid1=DE14&lac2=&cid2=&lac3=&cid3=&lac4=&cid4=
 // 
-//db.serialize(function() {
 //  db.run("CREATE TABLE event (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),event INTEGER)");
 //	db.run("CREATE TABLE batt  (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),data TEXT,voltage REAL,charging INTEGER)");
 //	db.run("CREATE TABLE bts   (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),dev_time TEXT,data TEXT)");
 //	db.run("CREATE TABLE track (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),dev_time TEXT,lat REAL,long REAL,speed INTEGER,heading INTEGER,altitude INTEGER,satnum INTEGER,eventid INTEGER,mileage INTEGER)");
-//});
+
 // 40 lowbatt
 // 37 pd
 // 34 wakeup
@@ -84,20 +83,21 @@ net.createServer(function (socket) {
 		if(track_mode != track_mode_curr)
 		{
 			track_mode_curr = track_mode;
+			console.log("switch to "+track_mode);
 			if(track_mode == 'still')
 			{
 				socket.write("$WP+TRACK=0000,4,300,100,0,1,4,70\n");//<-still
-				console.log("switch to still");
+				db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,100);
 			}
-			if(track_mode == 'foot')
+			else if(track_mode == 'foot')
 			{
 				socket.write("$WP+TRACK=0000,9,30,100,0,1,4,40\n");//<-foot
-				console.log("switch to foot");
+				db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,101);
 			}
-			if(track_mode == 'car')
+			else if(track_mode == 'car')
 			{
 				socket.write("$WP+TRACK=0000,9,30,150,0,1,4,15\n");//<-car
-				console.log("switch to car");
+				db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,102);
 			}
 		}
 
@@ -117,14 +117,14 @@ net.createServer(function (socket) {
 				if( (fields[3] < 70)&&(fields[3] >30)&&(fields[2] < 45)&&( fields[2] > -14)&&(fields[2] != 0))
 				{
 					db.get("SELECT avg(speed) as avg FROM track2 WHERE time > strftime(\'%s\',\'now\')-(10*60)",function(err2,row2) {
-						if(row2.avg > 2)
+						if((row2.avg > 2)&&(fields[8] == 2))
 						{
 							if(track_mode == 'still')
 							{
 								track_mode = 'foot';
 							}
 						}
-						if(row2.avg > 7)
+						if((row2.avg > 7)&&(fields[8] == 2))
 						{
 							track_mode = 'car';
 						}
@@ -148,9 +148,7 @@ net.createServer(function (socket) {
 				}
 				if(fields[8] != 2)
 				{
-					db.serialize(function() {
-						db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,fields[8]);
-					});
+					db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,fields[8]);
 				}
 				if(fields[8] == 34)
 				{
@@ -163,20 +161,12 @@ net.createServer(function (socket) {
 
 			if((fields.length == 3)&&(fields[0] == "$MSG:GBLAC=1000000001"))
 			{
-				db.serialize(function() {
-			
-					db.run("INSERT INTO bts (trackerid,dev_time,data) VALUES (?,?,?)",0,fields[1],fields[2]);
-				
-				});
+				db.run("INSERT INTO bts (trackerid,dev_time,data) VALUES (?,?,?)",0,fields[1],fields[2]);
 			}
 			
 			if((fields.length == 3)&&(fields[0] == "$OK:TEST=0"))
 			{
-				db.serialize(function() {
-			
-					db.run("INSERT INTO batt (trackerid,data) VALUES (?,?)",0,fields[1]);
-				
-				});
+				db.run("INSERT INTO batt (trackerid,data) VALUES (?,?)",0,fields[1]);
 			}
 		}
 	});
