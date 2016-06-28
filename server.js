@@ -25,7 +25,7 @@ var io = require('socket.io')(http);
 //});
 // 40 lowbatt
 // 37 pd
-
+// 34 wakeup
 
 var once = true;
 
@@ -37,34 +37,46 @@ net.createServer(function (socket) {
 	{
 		once = false;
 	
-		//socket.write("$WP+TRACK=0000,9,120,150,0,1,4,15\n");
+		//socket.write("$WP+TRACK=0000,9,30,150,0,1,4,15\n");<-car
+		//socket.write("$WP+TRACK=0000,9,30,50,0,1,4,70\n");<-foot
+		//socket.write("$WP+TRACK=0000,4,300,50,0,1,4,70\n");<-still
 		//socket.write("$WP+GSMINFO=0000\n");
 		//socket.write("$WP+TEST=0000\n");
 		//300(5) nach stillstand,aller 900(15) wieder
-		//socket.write("$WP+PSM=0000,1,300,1,2,2,900\n");//GPRS active
+		//socket.write("$WP+PSM=0000,1,300,1,2,2,3600\n");//GPRS active
 		//socket.write("$WP+PSM=0000,2,300,1,2,2,900\n");//GPRS off
-		//socket.write("$WP+PSM=0000,4,300,1,2,2,900\n");//GSM off
+		//socket.write("$WP+PSM=0000,4,300,1,3,3,3600\n");//GSM off <--
+		//socket.write("$WP+IDLESET=0000,30,10\n");
 		//socket.write("$WP+PSM=0000,0\n");//poweron
 		//socket.write("$WP+SETMILE=0000,1,0\n");
 		//socket.write("$WP+GETLOCATION=0000\n");
 		//socket.write("$WP+REBOOT=0000\n");
 	};
-	
+
+	var timer1;
+
 	function test()
 	{
 		socket.write("$WP+TEST=0000\n");
 		console.log("reg batt");
-		setTimeout(test, 30*60*1000);
+		timer1 = setTimeout(test, 30*60*1000);
 	}
 
 	test();
 
 
-	socket.on('disconnect', function () {
+	socket.on('close', function () {
 		console.log("tracker gone");
+		if(timer1)
+		{
+			clearTimeout(timer1);
+		}
 	});
 
-
+	socket.on('error', function(err) {
+		console.log("tracker err");
+	});
+	
 	socket.on('data', function (data) {
 	
 		var tokens = data.toString().replace(/^\s+|\s+$/g, '').split(/\s+/g);
@@ -79,23 +91,33 @@ net.createServer(function (socket) {
 
 			if((fields.length == 9)&&(fields[0] == "1000000001"))
 			{
-				db.serialize(function() {
-			
-					db.run("INSERT INTO track (trackerid,time,lat,long,speed,heading,altitude,satnum,eventid) VALUES (?,?,?,?,?,?,?,?,?)",0,fields[1],fields[2],fields[3],fields[4],fields[5],fields[6],fields[7],fields[8]);
-				
-				});
+				if( (fields[3] < 70)&&(fields[3] >30)&&(fields[2] < 45)&&( fields[2] > -14)&&(fields[2] != 0))
+				{
+					db.serialize(function() {
+						db.run("INSERT INTO track (trackerid,time,lat,long,speed,heading,altitude,satnum,eventid) VALUES (?,?,?,?,?,?,?,?,?)",0,fields[1],fields[2],fields[3],fields[4],fields[5],fields[6],fields[7],fields[8]);
+					});
 						
-				io.emit('pos',{lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
-			};
+					io.emit('pos',{lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
+				}
+				else
+				{
+					console.log("do not log");
+				}
+			}
 			if((fields.length == 10)&&(fields[0] == "1000000001"))
 			{
-				db.serialize(function() {
-			
-					db.run("INSERT INTO track (trackerid,time,lat,long,speed,heading,altitude,satnum,eventid,mileage) VALUES (?,?,?,?,?,?,?,?,?,?)",0,fields[1],fields[2],fields[3],fields[4],fields[5],fields[6],fields[7],fields[8],parseInt(fields[9]*1000));
-				
-				});
+				if( (fields[3] < 70)&&(fields[3] >30)&&(fields[2] < 45)&&( fields[2] > -14)&&(fields[2] != 0))
+				{
+					db.serialize(function() {
+						db.run("INSERT INTO track (trackerid,time,lat,long,speed,heading,altitude,satnum,eventid,mileage) VALUES (?,?,?,?,?,?,?,?,?,?)",0,fields[1],fields[2],fields[3],fields[4],fields[5],fields[6],fields[7],fields[8],parseInt(fields[9]*1000));
+					});
 						
-				io.emit('pos',{lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
+					io.emit('pos',{lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
+				}
+				else
+				{
+					console.log("do not log");
+				}
 			};
 
 			if((fields.length == 3)&&(fields[0] == "$MSG:GBLAC=1000000001"))
@@ -133,7 +155,7 @@ io.on('connection', function(socket){
 	
 		if(msg)
 		{
-			db.each("SELECT * FROM (SELECT packetid,time,lat,long,speed,heading,satnum,eventid FROM track ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg, function(err, pos) {
+			db.each("SELECT * FROM (SELECT packetid,time,lat,long,speed,heading,satnum,eventid FROM track WHERE ((satnum > 5)and( speed>2)) ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg, function(err, pos) {
 				io.emit('pos',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.time+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
 			});
 		}
