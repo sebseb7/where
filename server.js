@@ -7,8 +7,13 @@ var db = new sqlite3.Database('track.db');
 var app = require('express')();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
-
-
+var session = require("express-session")({
+		secret: "sid",
+		secret: "sosec",
+		resave: true,
+		saveUninitialized: true
+	});
+var sharedsession = require("express-socket.io-session");
 
 
 // http://www.open-electronics.org/celltrack/celltxt.php?hex=1&mcc=262&mnc=07&lac=4F71&cid=5B0A
@@ -35,13 +40,8 @@ net.createServer(function (socket) {
 		once = false;
 	
 		//SMS/USB: $WP+COMMTYPE=0000,4,,,<apn>,,,<ip/host>,<port>,0,<dns>
-		//socket.write("$WP+PSM=0000,1,300,1,2,2,3600\n");//GPRS active
-		//socket.write("$WP+PSM=0000,2,300,1,2,2,900\n");//GPRS off
-		//socket.write("$WP+PSM=0000,4,300,1,3,3,3600\n");//GSM off <--
-		//socket.write("$WP+SETMILE=0000,1,0\n");
 		//socket.write("$WP+GETLOCATION=0000\n");
 		//socket.write("$WP+REBOOT=0000\n");
-		//socket.write("$WP+GBLAC=0000,1\n");
 		//socket.write("$WP+LOWBATT=0000,2\n");
 	};
 
@@ -71,21 +71,33 @@ net.createServer(function (socket) {
 	
 	socket.on('data', function (data) {
 
+		// if battery is low switch to more consvervative power modes
+		//
+		// socket.write("$WP+PSM=0000,1,300,1,2,2,900\n");//GPRS active  <-- oncharger
+		// socket.write("$WP+PSM=0000,4,300,1,2,2,3600\n");//GPS/GSM off <-- onbattery
+		// socket.write("$WP+PSM=0000,4,300,1,3,3,21600\n");//GSM off <-- battery below 3.9
+		//
+		
+		
+		//if GPS is bad active BTS info
+		//socket.write("$WP+GBLAC=0000,1\n");
+		//socket.write("$WP+GBLAC=0000,0\n");
+
 		if(track_mode != track_mode_curr)
 		{
 			track_mode_curr = track_mode;
 			console.log("switch to "+track_mode);
-			if(track_mode == 'still')
+			if(track_mode === 'still')
 			{
 				socket.write("$WP+TRACK=0000,4,300,100,0,1,4,70\n");//<-still
 				db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,100);
 			}
-			else if(track_mode == 'foot')
+			else if(track_mode === 'foot')
 			{
 				socket.write("$WP+TRACK=0000,9,30,100,0,1,4,40\n");//<-foot
 				db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,101);
 			}
-			else if(track_mode == 'car')
+			else if(track_mode === 'car')
 			{
 				socket.write("$WP+TRACK=0000,9,30,150,0,1,4,15\n");//<-car
 				db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,102);
@@ -103,14 +115,18 @@ net.createServer(function (socket) {
 			var fields = tokens[x].split(/,/g);
 			console.log(fields.length);
 
-			if((fields.length == 10)&&(fields[0] == "1000000001"))
+			if((fields.length == 9)&&(fields[0] === "1000000001"))
+			{
+				socket.write("$WP+SETMILE=0000,1,0\n");
+			} 
+			else if((fields.length == 10)&&(fields[0] === "1000000001"))
 			{
 				if( (fields[3] < 70)&&(fields[3] >30)&&(fields[2] < 45)&&( fields[2] > -14)&&(fields[2] != 0))
 				{
 					db.get("SELECT avg(speed) as avg FROM track2 WHERE time > strftime(\'%s\',\'now\')-(10*60)",function(err2,row2) {
 						if((row2.avg > 2)&&(fields[8] == 2))
 						{
-							if(track_mode == 'still')
+							if(track_mode === 'still')
 							{
 								track_mode = 'foot';
 							}
@@ -123,7 +139,7 @@ net.createServer(function (socket) {
 						{
 							track_mode = 'still';
 						}
-						db.run("INSERT INTO track2 (trackerid,dev_time,lat,long,speed,heading,altitude,satnum,eventid,mileage,avg_speed_10) VALUES (?,?,?,?,?,?,?,?,?,?,?)",0,fields[1],fields[2],fields[3],fields[4],fields[5],fields[6],fields[7],fields[8],parseInt(fields[9]*1000),row2.avg);
+						db.run("INSERT INTO track2 (trackerid,dev_time,lat,long,speed,heading,altitude,satnum,eventid,mileage,avg_speed_10,track_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",0,fields[1],fields[2],fields[3],fields[4],fields[5],fields[6],fields[7],fields[8],parseInt(fields[9]*1000),row2.avg,track_mode);
 					
 						io.emit('pos',{avg_speed_10: row2.avg,lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>MD:"+track_mode+" EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
 					});
@@ -141,21 +157,14 @@ net.createServer(function (socket) {
 				{
 					db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,fields[8]);
 				}
-				if(fields[8] == 34)
-				{
-					if(track_mode == 'still')
-					{
-						track_mode='foot';
-					}
-				}
 			};
 
-			if((fields.length == 3)&&(fields[0] == "$MSG:GBLAC=1000000001"))
+			if((fields.length == 3)&&(fields[0] === "$MSG:GBLAC=1000000001"))
 			{
 				db.run("INSERT INTO bts (trackerid,dev_time,data) VALUES (?,?,?)",0,fields[1],fields[2]);
 			}
 			
-			if((fields.length == 3)&&(fields[0] == "$OK:TEST=0"))
+			if((fields.length == 3)&&(fields[0] === "$OK:TEST=0"))
 			{
 				db.run("INSERT INTO batt (trackerid,data) VALUES (?,?)",0,fields[1]);
 			}
@@ -166,19 +175,27 @@ net.createServer(function (socket) {
 
 console.log("start");
 
+app.use(session); 
+
 app.get('/', function(req, res){
+	console.log(req.session);
 	res.sendFile('index.html', { root: __dirname });
 });
 
+io.use(sharedsession(session, {
+	autoSave:true
+})); 
 
 io.on('connection', function(socket){
-
+	
 	socket.on('load', function(msg){
 	
+		console.log(socket.handshake.session);
+		
 		if(msg)
 		{
-			db.each("SELECT * FROM (SELECT packetid,datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 WHERE avg_speed_10 > 0 ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg, function(err, pos) {
-				io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
+			db.each("SELECT * FROM (SELECT packetid,datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid,track_mode FROM track2 WHERE avg_speed_10 > 0 ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg, function(err, pos) {
+				io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>MD:"+pos.track_mode+"EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
 			});
 		}
 	
@@ -191,6 +208,8 @@ io.on('connection', function(socket){
 		io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
 	});
 	
+	console.log(socket.handshake.session.id);
+	console.log(socket.handshake.session);
 	console.log("browser connected");
 });
 

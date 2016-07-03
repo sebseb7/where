@@ -18,12 +18,36 @@
 				padding: 10px;
 				margin: 10px;
 			}
+			#legend2 {
+				background: white;
+				padding: 10px;
+				margin: 10px;
+			}
 		</style>
 	</head>
 	<body>
 		<div id="map"></div>
-		<div id="legend"><input type="text" id="counter" style="width:20px"/><br/><a href="javascript:loadpath();">load</a></div>
+		<div id="legend">
+			<input type="text" id="counter" style="width:20px"/><br/>
+			<a href="javascript:loadpath();">load</a>
+			<br><br/>
+			<a href="javascript:window.location.href=location.protocol+'//x1:y@'+location.hostname+(location.port ? ':'+location.port: '')+'?logout=1'">logout</a>
+			</div>
+		<div id="legend2">
+			<a href="?login=1">login</a>
+		</div>
 		<script>
+			
+			function readCookie(name) {
+				var nameEQ = name + "=";
+				var ca = document.cookie.split(';');
+				for(var i=0;i < ca.length;i++) {
+					var c = ca[i];
+					while (c.charAt(0)==' ') c = c.substring(1,c.length);
+					if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+				}
+				return null;
+			}
 
 			var map;
 
@@ -32,7 +56,15 @@
 					center: {lat: 51.065338, lng: 13.751926},
 					zoom: 18
 				});
-				map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById('legend'));
+				//alert(readCookie('user'));
+				if(readCookie('user') === 'foo')
+				{
+					map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById('legend'));
+				}
+				else
+				{
+					map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById('legend2'));
+				}
 			};
 
 
@@ -48,6 +80,8 @@
 			var lastlat;
 			var globmarker=true;
 			
+			
+
 			function loadpath()
 			{
 				lastlon=null;
