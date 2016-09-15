@@ -59,11 +59,11 @@
 				//alert(readCookie('user'));
 				if(readCookie('user') === 'foo')
 				{
-					map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById('legend'));
+					map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById('legend2'));
 				}
 				else
 				{
-					map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById('legend2'));
+					map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById('legend'));
 				}
 			};
 
@@ -165,6 +165,31 @@
 
 					lastlon=msg.lon;
 					lastlat=msg.lat;
+				}
+			});
+			socket.on('pos2', function(msg){
+			
+				if(map)
+				{
+					var myLatlng = new google.maps.LatLng(msg.lon,msg.lat);
+		
+					var marker = new google.maps.Marker({
+						position: myLatlng,
+						map: map,
+						title: ''
+					});
+					marker.setIcon({
+						path: google.maps.SymbolPath.CIRCLE,
+						scale: 10
+					});
+
+					var infowindow = new google.maps.InfoWindow({
+						content: msg.info
+					});
+						
+					marker.addListener('click', function() {
+						infowindow.open(map, marker);
+					});
 				}
 			});
 		</script>

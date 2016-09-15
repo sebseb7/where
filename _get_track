@@ -1,0 +1,6 @@
+sqlite3 track.db <<EOF
+.header ON
+.mode column
+select * from track limit 1;
+EOF
+

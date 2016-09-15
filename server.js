@@ -21,6 +21,7 @@ var sharedsession = require("express-socket.io-session");
 //  db.run("CREATE TABLE event (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),event INTEGER)");
 //	db.run("CREATE TABLE batt  (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),data TEXT,voltage REAL,charging INTEGER)");
 //	db.run("CREATE TABLE bts   (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),dev_time TEXT,data TEXT)");
+//	db.run("CREATE TABLE ka    (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),dev_time TEXT,data TEXT)");
 //	db.run("CREATE TABLE track (packetid INTEGER PRIMARY KEY AUTOINCREMENT,trackerid INTEGER,time INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')),dev_time TEXT,lat REAL,long REAL,speed INTEGER,heading INTEGER,altitude INTEGER,satnum INTEGER,eventid INTEGER,mileage INTEGER)");
 
 // 40 lowbatt
@@ -104,18 +105,23 @@ net.createServer(function (socket) {
 			}
 		}
 
+		//console.log(data);
 
 		var tokens = data.toString().replace(/^\s+|\s+$/g, '').split(/\s+/g);
 
-		console.log(tokens.length);
+		//console.log(tokens.length);
 		for(var x = 0; x < tokens.length; x++){
 		
-			console.log(tokens[x]);
+			//console.log(tokens[x]);
 
 			var fields = tokens[x].split(/,/g);
-			console.log(fields.length);
+			//console.log(fields.length);
 
-			if((fields.length == 9)&&(fields[0] === "1000000001"))
+			if((fields.length == 4)&&(fields[0] === "pi1"))
+			{
+				db.run("INSERT INTO ka (trackerid,data) VALUES (?,?)",1,fields[1]+","+fields[2]+","+fields[3]);
+			} 
+			else if((fields.length == 9)&&(fields[0] === "1000000001"))
 			{
 				socket.write("$WP+SETMILE=0000,1,0\n");
 			} 
@@ -157,6 +163,14 @@ net.createServer(function (socket) {
 				{
 					db.run("INSERT INTO event (trackerid,event) VALUES (?,?)",0,fields[8]);
 				}
+			}
+			else if((fields.length == 10)&&(fields[0] === "pi1"))
+			{
+						
+				db.run("INSERT INTO track2 (trackerid,dev_time,lat,long,speed,heading,altitude,satnum,eventid,mileage,avg_speed_10,track_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",1,fields[1],fields[2],fields[3],fields[4],fields[5],fields[6],fields[7],fields[8],parseInt(fields[9]*1000),0,'');
+					
+				io.emit('pos2',{lat: fields[2],lon: fields[3],head: fields[5],speed: fields[4],info:fields[1]+"<br/>EV:"+fields[8]+" SAT:"+fields[7]+" SPEED:"+fields[4]});
+						
 			};
 
 			if((fields.length == 3)&&(fields[0] === "$MSG:GBLAC=1000000001"))
@@ -194,18 +208,31 @@ io.on('connection', function(socket){
 		
 		if(msg)
 		{
-			db.each("SELECT * FROM (SELECT packetid,datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid,track_mode FROM track2 WHERE avg_speed_10 > 0 ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg, function(err, pos) {
-				io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>MD:"+pos.track_mode+"EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
+			const factor = 30;
+			var i = 0;
+			db.each("SELECT * FROM (SELECT packetid,datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid,track_mode FROM track2 WHERE trackerid = 0 AND avg_speed_10 > 2 ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg*factor, function(err, pos) {
+				i++;
+				if(i==factor)
+				{
+					io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>MD:"+pos.track_mode+"EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
+					i=0;
+				}
 			});
+//			db.each("SELECT * FROM (SELECT packetid,datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid,track_mode FROM track2 WHERE trackerid = 1 ORDER BY packetid DESC LIMIT ? ) ORDER BY packetid ASC;",msg, function(err, pos) {
+//				io.emit('pos2',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
+//			});
 		}
 	
 	});
 
-	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 WHERE satnum > 5 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
+	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 WHERE trackerid = 0 AND satnum > 5 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
 		io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
 	});
-	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
+	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 WHERE trackerid = 0 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
 		io.emit('pos',{avg_speed_10:pos.avg_speed_10,lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed+"("+pos.avg_speed_10+")"});
+	});
+	db.each("SELECT datetime(time, 'unixepoch', 'localtime') as ltime,avg_speed_10,lat,long,speed,heading,satnum,eventid FROM track2 WHERE trackerid = 1 ORDER BY packetid DESC LIMIT 1", function(err, pos) {
+		io.emit('pos2',{lat: pos.lat,lon: pos.long,head: pos.heading,speed: pos.speed,info:pos.ltime+"<br/>EV:"+pos.eventid+" SAT:"+pos.satnum+" SPEED:"+pos.speed});
 	});
 	
 	console.log(socket.handshake.session.id);

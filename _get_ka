@@ -1,0 +1,5 @@
+sqlite3 track.db <<EOF
+.header ON
+select datetime(time, 'unixepoch', 'localtime'),* from ka;
+EOF
+
